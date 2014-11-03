@@ -6,17 +6,6 @@
             [shareablee.collection.utils :as cu])
   (:import (java.net SocketException SocketTimeoutException)))
 
-;; input: [url opts]
-;; - examples:
-;;    ["http://example.com" {:query-params {"foo" "bar"}}]
-;;    ["http://example.com" {:method :post}]
-;;
-;; output: [state response]
-;; - examples:
-;;    ["response" {...}]
-;;    ["socket_timeout" nil]
-;;    ["socket_error" nil]
-
 (defn mk-req
   [tuple conf]
   (let [tuple-map (cm/map-keys-1 keyword tuple)]
