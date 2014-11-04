@@ -7,7 +7,7 @@
   (:import (java.net SocketException SocketTimeoutException)))
 
 (storm/defspout mock-spout
-  ["url" "opts"]
+  ["meta" "url" "opts"]
   [conf context collector]
   nil)
 
@@ -19,28 +19,34 @@
 
 (defn mock-tuples
   []
-  {"mock-spout" [["http://example.com" {}]]})
+  {"mock-spout" [[{:foo "bar"} "http://example.com" {}]]})
 
 (deftest test-response
   (testing "A SocketException is thrown"
     (st/with-simulated-time-local-cluster [cluster]
       (with-redefs [http/request (fn [req] {:status 418})]
         (let [r (st/complete-topology cluster (mock-topology) :mock-sources (mock-tuples))]
-          (is (st/ms= [["http://example.com" {}]] (st/read-tuples r "mock-spout")))
-          (is (st/ms= [["response" {:status 418}]] (st/read-tuples r "http"))))))))
+          (is (st/ms= [[{:foo "bar"} "http://example.com" {}]]
+                      (st/read-tuples r "mock-spout")))
+          (is (st/ms= [[{:foo "bar"} "response" {:status 418}]]
+                      (st/read-tuples r "http"))))))))
 
 (deftest test-socket-error
   (testing "A SocketException is thrown"
     (st/with-simulated-time-local-cluster [cluster]
       (with-redefs [http/request (fn [req] (throw (SocketException.)))]
         (let [r (st/complete-topology cluster (mock-topology) :mock-sources (mock-tuples))]
-          (is (st/ms= [["http://example.com" {}]] (st/read-tuples r "mock-spout")))
-          (is (st/ms= [["socket_error" nil]] (st/read-tuples r "http"))))))))
+          (is (st/ms= [[{:foo "bar"} "http://example.com" {}]]
+                      (st/read-tuples r "mock-spout")))
+          (is (st/ms= [[{:foo "bar"} "socket_error" nil]]
+                      (st/read-tuples r "http"))))))))
 
 (deftest test-socket-timeout
   (testing "A SocketException is thrown"
     (st/with-simulated-time-local-cluster [cluster]
       (with-redefs [http/request (fn [req] (throw (SocketTimeoutException.)))]
         (let [r (st/complete-topology cluster (mock-topology) :mock-sources (mock-tuples))]
-          (is (st/ms= [["http://example.com" {}]] (st/read-tuples r "mock-spout")))
-          (is (st/ms= [["socket_timeout" nil]] (st/read-tuples r "http"))))))))
+          (is (st/ms= [[{:foo "bar"} "http://example.com" {}]]
+                      (st/read-tuples r "mock-spout")))
+          (is (st/ms= [[{:foo "bar"} "socket_timeout" nil]]
+                      (st/read-tuples r "http"))))))))

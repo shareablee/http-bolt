@@ -17,7 +17,7 @@
             :conn-timeout (get conf "HTTP_BOLT_SOCKET_ERROR" 10000)})))
 
 (storm/defbolt http-bolt
-  ["state" "response"]
+  ["meta" "state" "response"]
   {:prepare true}
   [conf context collector]
   (storm/bolt-execute
@@ -25,13 +25,13 @@
    (try
      (let [[res elapsed-ms] (cu/capture-time (http/request (mk-req tuple conf)))]
        (sl/log-message "HTTP Bolt took " elapsed-ms "ms.")
-       (storm/emit-bolt! collector ["response" res] :anchor tuple)
+       (storm/emit-bolt! collector [(get tuple "meta") "response" res] :anchor tuple)
        (storm/ack! collector tuple))
      (catch SocketTimeoutException e
        (sl/log-error e "HTTP Bolt caught SocketTimeoutException (see below).")
-       (storm/emit-bolt! collector ["socket_timeout" nil] :anchor tuple)
+       (storm/emit-bolt! collector [(get tuple "meta") "socket_timeout" nil] :anchor tuple)
        (storm/ack! collector tuple))
      (catch SocketException e
        (sl/log-error e "HTTP Bolt caught SocketException (see below).")
-       (storm/emit-bolt! collector ["socket_error" nil] :anchor tuple)
+       (storm/emit-bolt! collector [(get tuple "meta") "socket_error" nil] :anchor tuple)
        (storm/ack! collector tuple)))))
