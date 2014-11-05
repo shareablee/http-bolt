@@ -4,7 +4,8 @@
             [clj-http.client :as http]
             [shareablee.collection.map :as cm]
             [shareablee.collection.utils :as cu])
-  (:import (java.net SocketException SocketTimeoutException)))
+  (:import (java.net SocketException SocketTimeoutException)
+           (org.apache.http.conn ConnectTimeoutException)))
 
 (defn mk-req
   [tuple conf]
@@ -26,6 +27,10 @@
      (let [[res elapsed-ms] (cu/capture-time (http/request (mk-req tuple conf)))]
        (sl/log-message "HTTP Bolt took " elapsed-ms "ms.")
        (storm/emit-bolt! collector [(get tuple "meta") "response" res] :anchor tuple)
+       (storm/ack! collector tuple))
+     (catch ConnectTimeoutException e
+       (sl/log-error e "HTTP Bolt caught ConnectTimeoutException (see below).")
+       (storm/emit-bolt! collector [(get tuple "meta") "connection_timeout" nil] :anchor tuple)
        (storm/ack! collector tuple))
      (catch SocketTimeoutException e
        (sl/log-error e "HTTP Bolt caught SocketTimeoutException (see below).")

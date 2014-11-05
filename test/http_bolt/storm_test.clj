@@ -4,7 +4,8 @@
             [clojure.test :refer [deftest is testing]]
             [clj-http.client :as http]
             [http-bolt.storm :refer [http-bolt]])
-  (:import (java.net SocketException SocketTimeoutException)))
+  (:import (java.net SocketException SocketTimeoutException)
+           (org.apache.http.conn ConnectTimeoutException)))
 
 (storm/defspout mock-spout
   ["meta" "url" "opts"]
@@ -49,4 +50,14 @@
           (is (st/ms= [[{:foo "bar"} "http://example.com" {}]]
                       (st/read-tuples r "mock-spout")))
           (is (st/ms= [[{:foo "bar"} "socket_timeout" nil]]
+                      (st/read-tuples r "http"))))))))
+
+(deftest test-connection-timeout
+  (testing "A SocketException is thrown"
+    (st/with-simulated-time-local-cluster [cluster]
+      (with-redefs [http/request (fn [req] (throw (ConnectTimeoutException.)))]
+        (let [r (st/complete-topology cluster (mock-topology) :mock-sources (mock-tuples))]
+          (is (st/ms= [[{:foo "bar"} "http://example.com" {}]]
+                      (st/read-tuples r "mock-spout")))
+          (is (st/ms= [[{:foo "bar"} "connection_timeout" nil]]
                       (st/read-tuples r "http"))))))))
