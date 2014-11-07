@@ -1,5 +1,7 @@
 # HTTP Bolt
 
+[![Build Status](https://magnum.travis-ci.com/shareablee/http-bolt.svg?token=K6s6pdvGP253fz9WbBKT)](https://magnum.travis-ci.com/shareablee/http-bolt)
+
 ## Usage
 
 ### Input
