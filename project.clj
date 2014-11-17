@@ -1,4 +1,4 @@
-(defproject http-bolt "0.1.0"
+(defproject http-bolt "0.1.1-SNAPSHOT"
   :description "A bolt for making arbitrary HTTP requests."
   :dependencies [[com.shareablee/collection "0.1.5"]
                  [org.clojure/clojure "1.4.0"]
