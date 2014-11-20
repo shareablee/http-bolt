@@ -3,7 +3,8 @@
             [backtype.storm.log :as sl]
             [clj-http.client :as http]
             [shareablee.collection.map :as cm]
-            [shareablee.collection.utils :as cu])
+            [shareablee.collection.utils :as cu]
+            [http-bolt.fields :as fields])
   (:import (java.net SocketException SocketTimeoutException)
            (org.apache.http.conn ConnectTimeoutException)))
 
@@ -18,7 +19,7 @@
             :conn-timeout (get conf "HTTP_BOLT_SOCKET_ERROR" 10000)})))
 
 (storm/defbolt http-bolt
-  ["meta" "state" "response"]
+  fields/out-fields
   {:prepare true}
   [conf context collector]
   (storm/bolt-execute
@@ -26,17 +27,17 @@
    (try
      (let [[res elapsed-ms] (cu/capture-time (http/request (mk-req tuple conf)))]
        (sl/log-message "HTTP Bolt took " elapsed-ms "ms.")
-       (storm/emit-bolt! collector [(get tuple "meta") "response" res] :anchor tuple)
+       (storm/emit-bolt! collector [(:meta tuple) "response" res] :anchor tuple)
        (storm/ack! collector tuple))
      (catch ConnectTimeoutException e
        (sl/log-error e "HTTP Bolt caught ConnectTimeoutException (see below).")
-       (storm/emit-bolt! collector [(get tuple "meta") "connection_timeout" nil] :anchor tuple)
+       (storm/emit-bolt! collector [(:meta tuple) "connection_timeout" nil] :anchor tuple)
        (storm/ack! collector tuple))
      (catch SocketTimeoutException e
        (sl/log-error e "HTTP Bolt caught SocketTimeoutException (see below).")
-       (storm/emit-bolt! collector [(get tuple "meta") "socket_timeout" nil] :anchor tuple)
+       (storm/emit-bolt! collector [(:meta tuple) "socket_timeout" nil] :anchor tuple)
        (storm/ack! collector tuple))
      (catch SocketException e
        (sl/log-error e "HTTP Bolt caught SocketException (see below).")
-       (storm/emit-bolt! collector [(get tuple "meta") "socket_error" nil] :anchor tuple)
+       (storm/emit-bolt! collector [(:meta tuple) "socket_error" nil] :anchor tuple)
        (storm/ack! collector tuple)))))
