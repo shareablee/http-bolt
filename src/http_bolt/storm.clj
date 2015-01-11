@@ -2,15 +2,32 @@
   (:require [backtype.storm.clojure :as storm]
             [backtype.storm.log :as sl]
             [clj-http.client :as http]
-            [shareablee.collection.map :as cm]
-            [shareablee.collection.utils :as cu]
             [http-bolt.fields :as fields])
   (:import (java.net SocketException SocketTimeoutException)
            (org.apache.http.conn ConnectTimeoutException)))
 
+(defn map-keys-1
+  "Transforms the top level keys in the given map to keywords, unless
+  you provide f, then that function will be used as the transformer."
+  [f m]
+  (reduce-kv #(assoc %1 (f %2) %3) {} m))
+
+(defn capture-time-fn
+  "Returns a tuple of how much time it took (in ms) for the thunk to
+  execute, and the return value of the function."
+  [f]
+  (let [start (System/currentTimeMillis)]
+    [(f) (/ (double (- (System/currentTimeMillis) start)) 1000.0)]))
+
+(defmacro capture-time
+  "Returns a tuple of how much time it took (in ms) the code to
+  execute and the value of the last expression."
+  [& body]
+  `(capture-time-fn (fn [] ~@body)))
+
 (defn mk-req
   [tuple conf]
-  (let [tuple-map (cm/map-keys-1 keyword tuple)]
+  (let [tuple-map (map-keys-1 keyword tuple)]
     (merge {:method :get} ;; overwritable defaults
            (:opts tuple-map)
            {:url (:url tuple-map)
@@ -25,7 +42,7 @@
   (storm/bolt-execute
    [tuple]
    (try
-     (let [[res elapsed-ms] (cu/capture-time (http/request (mk-req tuple conf)))]
+     (let [[res elapsed-ms] (capture-time (http/request (mk-req tuple conf)))]
        (sl/log-message "HTTP Bolt took " elapsed-ms "ms.")
        (storm/emit-bolt! collector [(:meta tuple) "response" res] :anchor tuple)
        (storm/ack! collector tuple))
