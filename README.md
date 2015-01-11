@@ -4,6 +4,12 @@
 
 ## Usage
 
+Include the following in `project.clj`:
+
+```
+[http-bolt "0.1.2"]
+```
+
 ### Input
 
 ```
@@ -52,3 +58,9 @@ both of these states.
 
 * `HTTP_BOLT_SOCKET_TIMEOUT`: In milliseconds, defaults to 10000.
 * `HTTP_BOLT_CONN_TIMEOUT`: In milliseconds, defaults to 10000.
+
+## Running tests
+
+```
+lein test
+```
