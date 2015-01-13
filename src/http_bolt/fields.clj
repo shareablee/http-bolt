@@ -2,7 +2,7 @@
 
 
 (def in-fields
-  ["meta" "url" "params"])
+  ["meta" "url" "opts"])
 
 (def out-fields
   ["meta" "state" "response"])
