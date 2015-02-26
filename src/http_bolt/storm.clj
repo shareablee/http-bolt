@@ -6,6 +6,7 @@
   (:import (java.net SocketException SocketTimeoutException)
            (org.apache.http.conn ConnectTimeoutException)))
 
+
 (defn map-keys-1
   "Transforms the top level keys in the given map to keywords, unless
   you provide f, then that function will be used as the transformer."
@@ -42,7 +43,10 @@
   (storm/bolt-execute
    [tuple]
    (try
-     (let [[res elapsed-ms] (capture-time (http/request (mk-req tuple conf)))]
+     ;; Converting the headers from a HeaderMap object to a clojure
+     ;; hashmap so storm does not throw a serialization error
+     (let [[http-res elapsed-ms] (capture-time (http/request (mk-req tuple conf)))
+           res (update-in http-res [:headers] (partial into {}))]
        (sl/log-message "HTTP Bolt took " elapsed-ms "ms.")
        (storm/emit-bolt! collector [(:meta tuple) "response" res] :anchor tuple)
        (storm/ack! collector tuple))
