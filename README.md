@@ -7,7 +7,7 @@
 Include the following in `project.clj`:
 
 ```
-[http-bolt "0.1.2"]
+[http-bolt "0.1.3"]
 ```
 
 ### Input
