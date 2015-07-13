@@ -1,63 +1,87 @@
 (ns http-bolt.storm-test
-  (:require [backtype.storm.clojure :as storm]
-            [backtype.storm.testing :as st]
-            [clojure.test :refer [deftest is testing]]
+  (:require [backtype.storm.testing :as st]
             [clj-http.client :as http]
-            [http-bolt.storm :refer [http-bolt]])
-  (:import (java.net SocketException SocketTimeoutException)
+            [clojure.test :refer :all]
+            [http-bolt.storm :refer :all])
+  (:import (backtype.storm.task IOutputCollector OutputCollector)
+           (java.net SocketException SocketTimeoutException)
            (org.apache.http.conn ConnectTimeoutException)))
 
-(storm/defspout mock-spout
-  ["meta" "url" "opts"]
-  [conf context collector]
-  nil)
+(deftype MockOutputCollector [state]
+  IOutputCollector
+  (ack
+    [collector tuple]
+    (swap! state conj [:ack]))
+  (emit
+    [collector stream-id anchors tuple]
+    (swap! state conj [:emit stream-id tuple])
+    '() ;; supposed to return a list of task-ids
+    )
+  (emitDirect
+    [collector task-id stream-id anchors tuple]
+    (swap! state conj [:emit-direct task-id stream-id tuple]))
+  (fail
+    [collector tuple]
+    (swap! state conj [:fail])))
 
-(defn mock-topology
+(defn mk-collector
   []
-  (storm/topology
-   {"mock-spout" (storm/spout-spec mock-spout)}
-   {"http" (storm/bolt-spec {"mock-spout" :shuffle} http-bolt)}))
+  (let [state (atom [])]
+    [state (OutputCollector. (->MockOutputCollector state))]))
 
-(defn mock-tuples
+(defn invoke-bolt
+  [conf tuple fields bolt-fn & args]
+  (let [[state collector] (mk-collector)]
+    (doto (if (seq args)
+            (apply bolt-fn args)
+            (bolt-fn))
+      (.prepare conf nil collector)
+      (.execute (st/test-tuple tuple :fields fields))
+      (.cleanup))
+    @state))
+
+(defn invoke-http-bolt
   []
-  {"mock-spout" [[{:foo "bar"} "http://example.com" {}]]})
+  (invoke-bolt
+   {}
+   [{:foo "bar"} "http://example.com" {}]
+   ["meta" "url" "opts"]
+   http-bolt*))
 
 (deftest test-response
-  (testing "A SocketException is thrown"
-    (st/with-simulated-time-local-cluster [cluster]
-      (with-redefs [http/request (fn [req] {:status 418})]
-        (let [r (st/complete-topology cluster (mock-topology) :mock-sources (mock-tuples))]
-          (is (st/ms= [[{:foo "bar"} "http://example.com" {}]]
-                      (st/read-tuples r "mock-spout")))
-          (is (st/ms= [[{:foo "bar"} "response" {:status 418}]]
-                      (st/read-tuples r "http"))))))))
+  (with-redefs [http/request (fn [req] {:status 418})]
+    (let [state (invoke-http-bolt)]
+      (is (= [[:emit
+               "default"
+               [{:foo "bar"}
+                "response"
+                {:headers {}, :status 418}]]
+              [:ack]]
+             state)))))
 
 (deftest test-socket-error
-  (testing "A SocketException is thrown"
-    (st/with-simulated-time-local-cluster [cluster]
-      (with-redefs [http/request (fn [req] (throw (SocketException.)))]
-        (let [r (st/complete-topology cluster (mock-topology) :mock-sources (mock-tuples))]
-          (is (st/ms= [[{:foo "bar"} "http://example.com" {}]]
-                      (st/read-tuples r "mock-spout")))
-          (is (st/ms= [[{:foo "bar"} "socket_error" nil]]
-                      (st/read-tuples r "http"))))))))
+  (with-redefs [http/request (fn [req] (throw (SocketException.)))]
+    (let [state (invoke-http-bolt)]
+      (is (= [[:emit
+               "default"
+               [{:foo "bar"} "socket_error" nil]]
+              [:ack]]
+             state)))))
 
 (deftest test-socket-timeout
-  (testing "A SocketException is thrown"
-    (st/with-simulated-time-local-cluster [cluster]
-      (with-redefs [http/request (fn [req] (throw (SocketTimeoutException.)))]
-        (let [r (st/complete-topology cluster (mock-topology) :mock-sources (mock-tuples))]
-          (is (st/ms= [[{:foo "bar"} "http://example.com" {}]]
-                      (st/read-tuples r "mock-spout")))
-          (is (st/ms= [[{:foo "bar"} "socket_timeout" nil]]
-                      (st/read-tuples r "http"))))))))
+  (with-redefs [http/request (fn [req] (throw (SocketTimeoutException.)))]
+    (let [state (invoke-http-bolt)]
+      (is (= [[:emit
+               "default"
+               [{:foo "bar"} "socket_timeout" nil]]
+              [:ack]]
+             state)))))
 
 (deftest test-connection-timeout
-  (testing "A SocketException is thrown"
-    (st/with-simulated-time-local-cluster [cluster]
-      (with-redefs [http/request (fn [req] (throw (ConnectTimeoutException.)))]
-        (let [r (st/complete-topology cluster (mock-topology) :mock-sources (mock-tuples))]
-          (is (st/ms= [[{:foo "bar"} "http://example.com" {}]]
-                      (st/read-tuples r "mock-spout")))
-          (is (st/ms= [[{:foo "bar"} "connection_timeout" nil]]
-                      (st/read-tuples r "http"))))))))
+  (with-redefs [http/request (fn [req] (throw (ConnectTimeoutException.)))]
+    (let [state (invoke-http-bolt)]
+      (is (= [[:emit
+               "default"
+               [{:foo "bar"} "connection_timeout" nil]]
+              [:ack]]
+             state)))))
