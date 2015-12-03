@@ -3,6 +3,10 @@
   :url "https://github.com/shareablee/http-bolt"
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.5.1"]
-                 [clj-http "0.9.2" :exclusions [cheshire]]]
-  :profiles {:dev {:dependencies [[org.apache.storm/storm-core "0.9.3"]]}})
+  :dependencies [[clj-http "2.0.0"]]
+  :profiles {:0.10.x
+             {:dependencies [[org.apache.storm/storm-core "0.10.0"]
+                             [org.clojure/clojure "1.6.0"]]}
+             :0.9.x
+             {:dependencies [[org.apache.storm/storm-core "0.9.5"]
+                             [org.clojure/clojure "1.5.1"]]}})
